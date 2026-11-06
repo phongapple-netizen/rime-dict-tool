@@ -2,11 +2,16 @@
 import datetime
 import os
 import shutil
+import sys
 import winreg
 from collections import defaultdict
 from dataclasses import dataclass
 
-TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
+# 打包成 EXE 后，__file__ 在临时解压目录里，备份和数据要放在 EXE 旁边。
+if getattr(sys, "frozen", False):
+    TOOL_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
 PHRASE_FILE = "custom_phrase.txt"
 PERSONAL_FILE = "wubi86_personal.dict.yaml"
 BASE_FILE = "wubi86.dict.yaml"

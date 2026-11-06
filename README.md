@@ -32,11 +32,20 @@
 
 3. 如果用 Syncthing 同步用户目录，又不想同步联想内容，先把 `/predict_user.tsv` 和 `/lua/predict_user_filter.lua` 加入忽略规则。
 4. 重新部署小狼毫。
-5. 运行工具：
+5. 运行工具：从 Releases 下载 ZIP，解压后双击 `RimeDictTool.exe`。也可以从源码运行：
 
    ```bash
    pythonw rime_dict_tool.pyw
    ```
+
+EXE 没有代码签名，Windows 可能显示安全提示。备份保存在 EXE 旁边的 `backups` 文件夹，所以要解压到有写入权限的位置。
+
+## 打包
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --name RimeDictTool rime_dict_tool.pyw
+```
 
 ## 显示词库现有联想（可选）
 
