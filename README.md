@@ -10,7 +10,7 @@
 - **自定义编码**：写入 `custom_phrase.txt`，有重码时提醒。
 - **自动编码**：编码留空时按 86 五笔规则生成，写入 `wubi86_personal.dict.yaml`。
 - **调序**：把某个词排到该编码首位。原码表不会被修改。
-- **联想编辑**：指定前词后面优先显示的词，也可以隐藏词库里的词。内容保存在 `predict_user.tsv`。
+- **联想编辑**：指定前词后面优先显示的词，调整词库联想的顺序，也可以隐藏词库里的词。词库文件只读，调序靠把相关的词写入“我的联想”实现。内容保存在 `predict_user.tsv`。
 - **备份**：每次保存前，把原文件备份到 `backups/`。
 
 已学习的词只能查看，因为它们存放在 Rime 正在使用的数据库里。
@@ -23,14 +23,17 @@
 
 ## 安装
 
-1. 把 `rime_files/lua/predict_user_filter.lua` 复制到 Rime 用户目录的 `lua` 文件夹。
+1. 把 `rime_files/lua` 里的 `predict_user_filter.lua` 和 `predict_period.lua` 复制到 Rime 用户目录的 `lua` 文件夹。
 2. 在 `wubi86.custom.yaml` 的 `patch:` 下加入：
 
    ```yaml
    "engine/filters/@next": lua_filter@*predict_user_filter
+   "engine/processors/@before 1": lua_processor@*predict_period
    ```
 
-3. 如果用 Syncthing 同步用户目录，又不想同步联想内容，先把 `/predict_user.tsv` 和 `/lua/predict_user_filter.lua` 加入忽略规则。
+   第二行让联想状态下的句号直接上屏，否则句号会被默认的翻页键吃掉。
+
+3. 如果用 Syncthing 同步用户目录，又不想同步联想内容，先把 `/predict_user.tsv`、`/lua/predict_user_filter.lua` 和 `/lua/predict_period.lua` 加入忽略规则。
 4. 重新部署小狼毫。
 5. 运行工具：从 Releases 下载 ZIP，解压后双击 `RimeDictTool.exe`。也可以从源码运行：
 

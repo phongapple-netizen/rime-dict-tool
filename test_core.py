@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rime_dict_core import Store, rime_user_dir  # noqa: E402
+from rime_dict_core import Store, move_db_predict, predict_view, rime_user_dir  # noqa: E402
 
 SOURCE = rime_user_dir()
 FILES = ["custom_phrase.txt", "wubi86_personal.dict.yaml", "wubi86.dict.yaml", "installation.yaml"]
@@ -93,7 +93,90 @@ class CoreTest(Base):
             self.store.set_predict("工", ["!坏"])
 
 
+class MoveDbTest(unittest.TestCase):
+    DB = ["作", "程", "具", "业", "艺"]
+
+    def test_move_up_pins_prefix(self):
+        pins = move_db_predict([], [], self.DB, "具", -1)
+        self.assertEqual(pins, ["作", "具"])
+        self.assertEqual(predict_view(pins, [], self.DB), ["作", "具", "程", "业", "艺"])
+        pins = move_db_predict(pins, [], self.DB, "具", -1)
+        self.assertEqual(pins, ["具"])
+        self.assertEqual(predict_view(pins, [], self.DB), ["具", "作", "程", "业", "艺"])
+
+    def test_move_down_past_unpinned(self):
+        pins = move_db_predict([], [], self.DB, "作", 1)
+        self.assertEqual(pins, ["程"])
+        self.assertEqual(predict_view(pins, [], self.DB), ["程", "作", "具", "业", "艺"])
+
+    def test_moving_back_clears_pins(self):
+        pins = move_db_predict([], [], self.DB, "程", -1)
+        self.assertEqual(pins, ["程"])
+        self.assertEqual(move_db_predict(pins, [], self.DB, "程", 1), [])
+
+    def test_edges_and_hidden_change_nothing(self):
+        self.assertEqual(move_db_predict([], [], self.DB, "作", -1), [])
+        self.assertEqual(move_db_predict([], [], self.DB, "艺", 1), [])
+        self.assertEqual(move_db_predict([], ["程"], self.DB, "程", -1), [])
+        self.assertEqual(move_db_predict([], [], self.DB, "不存在", 1), [])
+
+    def test_skips_hidden_and_keeps_own_words(self):
+        pins = move_db_predict(["作坊"], ["程"], self.DB, "具", -1)
+        self.assertEqual(pins, ["作坊", "具"])
+        self.assertEqual(predict_view(pins, ["程"], self.DB), ["具", "作", "业", "艺", "程"])
+        pins = move_db_predict(pins, ["程"], self.DB, "作", -1)
+        self.assertEqual(pins, ["作坊"])
+
+
 class UiTest(Base):
+    def test_db_move_buttons(self):
+        from importlib.machinery import SourceFileLoader
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rime_dict_tool.pyw")
+        module = SourceFileLoader("rime_dict_tool", path).load_module()  # noqa: 测试用
+        self.store.db_predict["工"] = ["作", "程", "具"]
+        app = module.App(store=self.store, confirm=False)
+        try:
+            app.p_head.set("工")
+            app.load_predict()
+            app.db_list.selection_set(2)
+            app.db_move(-1)
+            self.assertEqual(app.db_words, ["作", "具", "程"])
+            self.assertEqual(app.selected_db(), "具")
+            self.assertIn("工\t具", self.read("predict_user.tsv"))
+            app.db_move(-1)
+            self.assertEqual(app.db_words, ["具", "作", "程"])
+            self.assertEqual(app.selected_db(), "具")
+            app.db_move(-1)
+            self.assertEqual(app.db_words, ["具", "作", "程"])
+            self.assertEqual(self.read("predict_user.tsv").count("工\t"), 1)
+            self.assertEqual(self.store.get_predict("工")[0], ["具"])
+            app.load_predict()
+            self.assertEqual(app.db_words, ["具", "作", "程"])
+            app.db_list.selection_clear(0, "end")
+            app.db_list.selection_set(2)
+            app.hide_db()
+            self.assertEqual(app.db_words, ["具", "作", "程"])
+            app.db_list.selection_set(2)
+            before = self.read("predict_user.tsv")
+            app.db_move(-1)
+            self.assertEqual(self.read("predict_user.tsv"), before)
+            self.assertIn("取消隐藏", app.status.get())
+            app.update()
+            shot = os.environ.get("RIME_TOOL_SHOT")
+            if shot:
+                app.tabs.select(1)
+                app.lift()
+                app.attributes("-topmost", True)
+                app.update()
+                app.after(400)
+                app.update()
+                from PIL import ImageGrab
+                box = (app.winfo_rootx(), app.winfo_rooty(),
+                       app.winfo_rootx() + app.winfo_width(), app.winfo_rooty() + app.winfo_height())
+                ImageGrab.grab(box).save(f"{shot}_dbmove.png")
+        finally:
+            app.destroy()
+
     def test_ui_flow(self):
         from importlib.machinery import SourceFileLoader
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rime_dict_tool.pyw")

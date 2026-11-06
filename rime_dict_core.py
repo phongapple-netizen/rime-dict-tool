@@ -58,6 +58,38 @@ SOURCE_LABELS = {"phrase": "自定义短语", "personal": "个人词典", "base"
                  "learned": "已学习（只读）"}
 
 
+def predict_view(pins, hidden, db_words):
+    """词库联想的实际显示顺序：排到前面的、其余的、隐藏的。"""
+    pinned = [w for w in pins if w in db_words]
+    rest = [w for w in db_words if w not in pins and w not in hidden]
+    hid = [w for w in db_words if w in hidden and w not in pins]
+    return pinned + rest + hid
+
+
+def move_db_predict(pins, hidden, db_words, word, delta):
+    """把词库联想词移动一位，返回新的 pins。
+
+    词库只读，只能靠 pins 决定顺序。这里只保留必要的词：
+    末尾的词如果不写进 pins 也会排在同一位置，就不写，调回原样时 pins 也随之变空。
+    """
+    visible = [w for w in predict_view(pins, hidden, db_words) if w not in hidden]
+    if word not in visible:
+        return list(pins)
+    target = visible.index(word) + delta
+    if not 0 <= target < len(visible):
+        return list(pins)
+    order = list(pins) + [w for w in visible if w not in pins]
+    a, b = order.index(word), order.index(visible[target])
+    order[a], order[b] = order[b], order[a]
+    keep = len(order)
+    while keep > 0 and order[keep - 1] in db_words:
+        natural = [w for w in db_words if w not in order[:keep - 1] and w not in hidden]
+        if natural != order[keep - 1:]:
+            break
+        keep -= 1
+    return order[:keep]
+
+
 class Store:
     def __init__(self, root=None, backup_root=None, tsv_path=None):
         self.root = root or rime_user_dir()

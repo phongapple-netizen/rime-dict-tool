@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from rime_dict_core import (DEFAULT_PERSONAL_WEIGHT, DEFAULT_PHRASE_WEIGHT, SOURCE_LABELS, Store,
-                            deployer_path)
+                            deployer_path, move_db_predict, predict_view)
 
 
 class App(tk.Tk):
@@ -21,6 +21,7 @@ class App(tk.Tk):
         self.pins = []
         self.hidden = []
         self.db_words = []
+        self.db_raw = []
         self.status = tk.StringVar(value="就绪。修改后点右下角“重新部署”才会生效。")
 
         tabs = ttk.Notebook(self)
@@ -239,10 +240,14 @@ class App(tk.Tk):
                                ("隐藏 →", self.hide_db), ("取消隐藏", self.unhide_db)):
             ttk.Button(mid, text=label, command=command, width=10).pack(pady=3)
 
-        ttk.Label(panes, text="词库现有联想（标“隐藏”的不会显示）").grid(row=0, column=2, sticky="w")
+        ttk.Label(panes, text="词库现有联想（按实际显示顺序，标“隐藏”的不会显示）").grid(row=0, column=2, sticky="w")
         self.db_list = tk.Listbox(panes, exportselection=False)
         self.db_list.grid(row=1, column=2, sticky="nsew")
         self.db_list.bind("<Double-1>", lambda _e: self.pin_from_db())
+        db_row = ttk.Frame(panes)
+        db_row.grid(row=2, column=2, sticky="w", pady=(4, 0))
+        ttk.Button(db_row, text="上移", command=lambda: self.db_move(-1), width=8).pack(side="left", padx=(0, 4))
+        ttk.Button(db_row, text="下移", command=lambda: self.db_move(1), width=8).pack(side="left")
 
         bottom = ttk.Frame(self.predict_tab)
         bottom.pack(fill="x")
@@ -259,31 +264,36 @@ class App(tk.Tk):
         if not head:
             return
         self.head = head
-        self.pins, self.hidden, self.db_words = self.store.get_predict(head)
+        self.pins, self.hidden, self.db_raw = self.store.get_predict(head)
         self.refresh_predict()
 
-    def refresh_predict(self, select=None):
+    def refresh_predict(self, select=None, db_select=None):
         self.pin_list.delete(0, "end")
         for word in self.pins:
             self.pin_list.insert("end", word)
         if select is not None and 0 <= select < len(self.pins):
             self.pin_list.selection_set(select)
+        self.db_words = predict_view(self.pins, self.hidden, self.db_raw)
         self.db_list.delete(0, "end")
         for word in self.db_words:
             self.db_list.insert("end", f"{word}（隐藏）" if word in self.hidden else word)
             if word in self.hidden:
                 self.db_list.itemconfig("end", foreground="gray")
+        if db_select in self.db_words:
+            index = self.db_words.index(db_select)
+            self.db_list.selection_set(index)
+            self.db_list.see(index)
         note = f"词库有 {len(self.db_words)} 个联想" if self.db_words else "词库没有这个前词，只显示你加的词"
         self.p_info.set(f"“{self.head}”：{note}")
 
-    def save_predict(self, message, select=None):
+    def save_predict(self, message, select=None, db_select=None):
         try:
             self.store.set_predict(self.head, self.pins, self.hidden)
         except (ValueError, OSError) as err:
             self.show_error(err)
             self.load_predict()
             return
-        self.refresh_predict(select)
+        self.refresh_predict(select, db_select)
         self.mark_dirty(message)
 
     def pin_add(self):
@@ -318,6 +328,18 @@ class App(tk.Tk):
     def selected_db(self):
         sel = self.db_list.curselection()
         return self.db_words[sel[0]] if sel else None
+
+    def db_move(self, delta):
+        word = self.selected_db()
+        if not word:
+            return
+        if word in self.hidden:
+            self.status.set(f"“{word}”已隐藏，先取消隐藏才能调整顺序。")
+            return
+        pins = move_db_predict(self.pins, self.hidden, self.db_raw, word, delta)
+        if pins != self.pins:
+            self.pins = pins
+            self.save_predict("已调整顺序，相关的词已写入“我的联想”。", db_select=word)
 
     def pin_from_db(self):
         word = self.selected_db()

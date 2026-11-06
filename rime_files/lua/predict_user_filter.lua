@@ -50,7 +50,7 @@ function M.init(env)
     local menu = Menu()
     menu:add_translation(Translation(function()
       for _, w in ipairs(e.pins) do
-        yield(Candidate("prediction", pos, pos, w, "★"))
+        yield(Candidate("prediction", pos, pos, w, ""))
       end
     end))
     seg.menu = menu
@@ -75,7 +75,7 @@ function M.func(input, env)
           for _, w in ipairs(e.pins) do
             if not seen[w] then
               seen[w] = true
-              yield(Candidate("prediction", cand.start, cand._end, w, "★"))
+              yield(Candidate("prediction", cand.start, cand._end, w, ""))
             end
           end
         end
