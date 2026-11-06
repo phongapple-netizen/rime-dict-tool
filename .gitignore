@@ -1,0 +1,7 @@
+# 备份里可能有私人短语，绝不提交
+backups/
+# 第三方 GPL-3.0 数据，按 README 自行下载
+data/
+__pycache__/
+*.pyc
+*.tmp
